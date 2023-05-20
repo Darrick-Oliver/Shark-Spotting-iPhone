@@ -8,10 +8,10 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject var cameraManager = CameraManager()
+    @StateObject var detector = ObjectDetector()
     
     var body: some View {
-        CameraPreview(cameraManager: cameraManager)
+        CameraPreview(detector: detector)
             .ignoresSafeArea()
     }
 }

@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		B9159A6C29EDFED3005046DF /* Camera.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9159A6B29EDFED3005046DF /* Camera.swift */; };
 		B9159A6E29EE0F78005046DF /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9159A6D29EE0F78005046DF /* CameraPreview.swift */; };
-		B9159A7029EE24D0005046DF /* ViewControllerDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9159A6F29EE24D0005046DF /* ViewControllerDetection.swift */; };
 		B9159AB129FA1AC1005046DF /* Detector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9159AB029FA1AC1005046DF /* Detector.swift */; };
 		B95C89142A09F13E00B96E7E /* best.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = B95C89132A09F13E00B96E7E /* best.mlmodel */; };
 		B9DF791B29DE1E550019C0E5 /* SharkSpottingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DF791A29DE1E550019C0E5 /* SharkSpottingApp.swift */; };
@@ -41,7 +40,6 @@
 /* Begin PBXFileReference section */
 		B9159A6B29EDFED3005046DF /* Camera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Camera.swift; sourceTree = "<group>"; };
 		B9159A6D29EE0F78005046DF /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
-		B9159A6F29EE24D0005046DF /* ViewControllerDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControllerDetection.swift; sourceTree = "<group>"; };
 		B9159AB029FA1AC1005046DF /* Detector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Detector.swift; sourceTree = "<group>"; };
 		B95C89132A09F13E00B96E7E /* best.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; name = best.mlmodel; path = SharkSpotting/Models/best.mlmodel; sourceTree = SOURCE_ROOT; };
 		B9DF791729DE1E550019C0E5 /* SharkSpotting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SharkSpotting.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -84,6 +82,7 @@
 		B9159A7129EE25CA005046DF /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B95C89132A09F13E00B96E7E /* best.mlmodel */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -91,21 +90,11 @@
 		B9159A7229EE25D4005046DF /* Camera */ = {
 			isa = PBXGroup;
 			children = (
-				B9159A7329EE25EB005046DF /* Detection Controller */,
 				B9159A6D29EE0F78005046DF /* CameraPreview.swift */,
 				B9159A6B29EDFED3005046DF /* Camera.swift */,
 				B9159AB029FA1AC1005046DF /* Detector.swift */,
-				B95C89132A09F13E00B96E7E /* best.mlmodel */,
 			);
 			path = Camera;
-			sourceTree = "<group>";
-		};
-		B9159A7329EE25EB005046DF /* Detection Controller */ = {
-			isa = PBXGroup;
-			children = (
-				B9159A6F29EE24D0005046DF /* ViewControllerDetection.swift */,
-			);
-			path = "Detection Controller";
 			sourceTree = "<group>";
 		};
 		B9DF790E29DE1E550019C0E5 = {
@@ -301,7 +290,6 @@
 				B9DF791B29DE1E550019C0E5 /* SharkSpottingApp.swift in Sources */,
 				B9159A6C29EDFED3005046DF /* Camera.swift in Sources */,
 				B95C89142A09F13E00B96E7E /* best.mlmodel in Sources */,
-				B9159A7029EE24D0005046DF /* ViewControllerDetection.swift in Sources */,
 				B9159AB129FA1AC1005046DF /* Detector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

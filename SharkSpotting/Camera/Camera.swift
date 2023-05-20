@@ -11,7 +11,7 @@ import AVFoundation
 class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, ObservableObject {
     var videoCaptureDevice: AVCaptureDevice?
     private var input: AVCaptureInput?
-    private let videoDataOut = AVCaptureVideoDataOutput()
+    let videoDataOutput = AVCaptureVideoDataOutput()
     let dataOutputQueue = DispatchQueue(label: "VideoDataQueue", qos: .userInitiated, attributes: [], autoreleaseFrequency: .workItem)
     let session = AVCaptureSession()
     
@@ -38,13 +38,13 @@ class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Obs
             input = videoInput
         }
         
-        if session.canAddOutput(videoDataOut) {
-            session.addOutput(videoDataOut)
-            videoDataOut.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
-            videoDataOut.setSampleBufferDelegate(self, queue: dataOutputQueue)
-            videoDataOut.connection(with: .video)?.videoOrientation = .portrait
-            videoDataOut.connection(with: .video)?.automaticallyAdjustsVideoMirroring = false
-            videoDataOut.connection(with: .video)?.isVideoMirrored = true
+        if session.canAddOutput(videoDataOutput) {
+            session.addOutput(videoDataOutput)
+            videoDataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
+            videoDataOutput.setSampleBufferDelegate(self, queue: dataOutputQueue)
+            videoDataOutput.connection(with: .video)?.videoOrientation = .portrait
+            videoDataOutput.connection(with: .video)?.automaticallyAdjustsVideoMirroring = false
+            videoDataOutput.connection(with: .video)?.isVideoMirrored = true
         } else {
             debugPrint("Could not add video data output")
         }

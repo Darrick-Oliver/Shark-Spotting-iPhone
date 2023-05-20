@@ -9,22 +9,23 @@ import SwiftUI
 import AVFoundation
 
 struct CameraPreview: UIViewRepresentable {
-    @ObservedObject var cameraManager: CameraManager
+    @ObservedObject var detector: ObjectDetector
     
     func makeUIView(context: Context) -> UIView {
         
         let view = UIView(frame: UIScreen.main.bounds)
         
-        cameraManager.setupCamera()
+        detector.setupCamera()
         
-        // Create a new AVCaptureVideoPreviewLayer and add it to the view
-        let previewLayer = AVCaptureVideoPreviewLayer(session: cameraManager.session)
-        previewLayer.videoGravity = .resizeAspectFill
-        previewLayer.frame = view.layer.bounds
-        view.layer.addSublayer(previewLayer)
+        // Add previewLayer to view
+        detector.previewLayer.videoGravity = .resizeAspectFill
+        detector.previewLayer.frame = view.layer.bounds
+        view.layer.addSublayer(detector.previewLayer)
         
-        // Start the capture session
-        cameraManager.startCapture()
+        // Start the capture session on the main thread
+        DispatchQueue.main.async {
+            detector.startDetection()
+        }
         
         return view
     }
@@ -33,7 +34,11 @@ struct CameraPreview: UIViewRepresentable {
         // Update the preview layer's frame if the view's frame changes
         if uiView.bounds != context.coordinator.lastBounds {
             context.coordinator.lastBounds = uiView.bounds
-            uiView.layer.sublayers?.first?.frame = uiView.layer.bounds
+            
+            // Perform the UI update on the main thread
+            DispatchQueue.main.async {
+                uiView.layer.sublayers?.first?.frame = uiView.layer.bounds
+            }
         }
     }
     
