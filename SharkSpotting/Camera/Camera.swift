@@ -29,6 +29,7 @@ class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Obs
               let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice) else { return; }
         
         session.beginConfiguration()
+        session.sessionPreset = .hd1920x1080
         defer { session.commitConfiguration() }
         
         self.videoCaptureDevice = videoCaptureDevice
@@ -42,7 +43,7 @@ class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Obs
             session.addOutput(videoDataOutput)
             videoDataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
             videoDataOutput.setSampleBufferDelegate(self, queue: dataOutputQueue)
-            videoDataOutput.connection(with: .video)?.videoOrientation = .portrait
+            videoDataOutput.connection(with: .video)?.videoOrientation = .portraitUpsideDown
             videoDataOutput.connection(with: .video)?.automaticallyAdjustsVideoMirroring = false
             videoDataOutput.connection(with: .video)?.isVideoMirrored = true
         } else {
@@ -53,7 +54,7 @@ class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Obs
     func startCapture() {
         debugPrint("Start capture")
         
-        guard isCapturing == false else { return }
+        guard !isCapturing else { return }
         isCapturing = true
         
         #if arch(arm64)
@@ -63,7 +64,7 @@ class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Obs
     
     func stopCapture() {
         debugPrint("Stop capture")
-        guard isCapturing == true else { return }
+        guard isCapturing else { return }
         isCapturing = false
 
         #if arch(arm64)

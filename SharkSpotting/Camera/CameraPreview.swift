@@ -12,17 +12,15 @@ struct CameraPreview: UIViewRepresentable {
     @ObservedObject var detector: ObjectDetector
     
     func makeUIView(context: Context) -> UIView {
-        
         let view = UIView(frame: UIScreen.main.bounds)
         
+        // Setup camera and preview layer
         detector.setupCamera()
-        
-        // Add previewLayer to view
         detector.previewLayer.videoGravity = .resizeAspectFill
         detector.previewLayer.frame = view.layer.bounds
         view.layer.addSublayer(detector.previewLayer)
         
-        // Start the capture session on the main thread
+        // Start detection
         DispatchQueue.main.async {
             detector.startDetection()
         }

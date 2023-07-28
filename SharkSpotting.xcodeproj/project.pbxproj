@@ -10,7 +10,8 @@
 		B9159A6C29EDFED3005046DF /* Camera.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9159A6B29EDFED3005046DF /* Camera.swift */; };
 		B9159A6E29EE0F78005046DF /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9159A6D29EE0F78005046DF /* CameraPreview.swift */; };
 		B9159AB129FA1AC1005046DF /* Detector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9159AB029FA1AC1005046DF /* Detector.swift */; };
-		B95C89142A09F13E00B96E7E /* best.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = B95C89132A09F13E00B96E7E /* best.mlmodel */; };
+		B92403DF2A3B98B400495EFC /* best.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = B92403DE2A3B98B400495EFC /* best.mlmodel */; };
+		B92403E12A3B99BA00495EFC /* another.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = B92403E02A3B99BA00495EFC /* another.mlmodel */; };
 		B9DF791B29DE1E550019C0E5 /* SharkSpottingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DF791A29DE1E550019C0E5 /* SharkSpottingApp.swift */; };
 		B9DF791D29DE1E550019C0E5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DF791C29DE1E550019C0E5 /* ContentView.swift */; };
 		B9DF791F29DE1E560019C0E5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B9DF791E29DE1E560019C0E5 /* Assets.xcassets */; };
@@ -41,7 +42,8 @@
 		B9159A6B29EDFED3005046DF /* Camera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Camera.swift; sourceTree = "<group>"; };
 		B9159A6D29EE0F78005046DF /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
 		B9159AB029FA1AC1005046DF /* Detector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Detector.swift; sourceTree = "<group>"; };
-		B95C89132A09F13E00B96E7E /* best.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; name = best.mlmodel; path = SharkSpotting/Models/best.mlmodel; sourceTree = SOURCE_ROOT; };
+		B92403DE2A3B98B400495EFC /* best.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = best.mlmodel; sourceTree = "<group>"; };
+		B92403E02A3B99BA00495EFC /* another.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = another.mlmodel; sourceTree = "<group>"; };
 		B9DF791729DE1E550019C0E5 /* SharkSpotting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SharkSpotting.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B9DF791A29DE1E550019C0E5 /* SharkSpottingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkSpottingApp.swift; sourceTree = "<group>"; };
 		B9DF791C29DE1E550019C0E5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -82,7 +84,8 @@
 		B9159A7129EE25CA005046DF /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				B95C89132A09F13E00B96E7E /* best.mlmodel */,
+				B92403DE2A3B98B400495EFC /* best.mlmodel */,
+				B92403E02A3B99BA00495EFC /* another.mlmodel */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -288,8 +291,9 @@
 				B9DF791D29DE1E550019C0E5 /* ContentView.swift in Sources */,
 				B9159A6E29EE0F78005046DF /* CameraPreview.swift in Sources */,
 				B9DF791B29DE1E550019C0E5 /* SharkSpottingApp.swift in Sources */,
+				B92403E12A3B99BA00495EFC /* another.mlmodel in Sources */,
+				B92403DF2A3B98B400495EFC /* best.mlmodel in Sources */,
 				B9159A6C29EDFED3005046DF /* Camera.swift in Sources */,
-				B95C89142A09F13E00B96E7E /* best.mlmodel in Sources */,
 				B9159AB129FA1AC1005046DF /* Detector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -452,7 +456,8 @@
 				DEVELOPMENT_TEAM = FHNPRXQRW2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "$(PRODUCT_NAME) uses the camera for detecting sharks";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SharkSpotting uses the camera for detecting sharks";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SharkSpotting uses the photo library to save captured video";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -482,7 +487,8 @@
 				DEVELOPMENT_TEAM = FHNPRXQRW2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "$(PRODUCT_NAME) uses the camera for detecting sharks";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SharkSpotting uses the camera for detecting sharks";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SharkSpotting uses the photo library to save captured video";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
