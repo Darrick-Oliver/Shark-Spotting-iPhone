@@ -24,23 +24,33 @@ class ObjectDetector: CameraManager {
     var count: Int = 0
     var fps: Double = 0.0
     private var startTime: Double = 0.0
+    private var endTime: Double = 0.0
     
     // Video and predictions
-    private var recordedFrames: [CVPixelBuffer] = []
+    private var videoWriter: AVAssetWriter?
+    private var videoWriterInput: AVAssetWriterInput?
+    private var videoWriterAdaptor: AVAssetWriterInputPixelBufferAdaptor?
+    private var videoURL: URL?
     private var sawShark: Bool = false
     private var predictions: [[VNRecognizedObjectObservation]] = []
+    private var presentationTime = CMTime.zero
+    
+    // Hardware Metrics
+    private var totalCPUUsage: Double = 0.0
+    private var totalCPUCores: Double = 0.0
     
     // Setting up camera and model
-    override func setupCamera() {
+    func setupCamera(frame: CGRect) {
         super.setupCamera()
         
         self.previewLayer = AVCaptureVideoPreviewLayer(session: super.session)
-        
+        self.previewLayer.frame = frame
+
         // Load the Core ML model
         guard let model = try? VNCoreMLModel(for: best(configuration: MLModelConfiguration()).model) else {
             fatalError("Failed to load model")
         }
-        
+
         // Create a vision request with the model
         self.request = VNCoreMLRequest(model: model, completionHandler: handleDetection)
         self.request.imageCropAndScaleOption = .scaleFill
@@ -54,11 +64,12 @@ class ObjectDetector: CameraManager {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([self.request])
         
-        // Record frame if a shark is spotted
-        if (sawShark && isRecording) {
-            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-            var copy = pixelBuffer.copy()
-            self.recordedFrames.append(copy)
+        // Record frame if a shark is spotted and recording is enabled
+        if sawShark && isRecording, let videoWriterInput = videoWriterInput {
+            if videoWriterInput.isReadyForMoreMediaData {
+                videoWriterAdaptor?.append(pixelBuffer, withPresentationTime: self.presentationTime)
+                self.presentationTime = CMTimeAdd(presentationTime, CMTimeMake(value:1, timescale: Int32(30)))
+            }
         }
     }
 
@@ -150,72 +161,11 @@ class ObjectDetector: CameraManager {
             super.stopCapture()
         }
     }
-    
-    func startMetricRecording() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            // Initialize counts and start time
-            self.count = 0
-            self.startTime = Date().timeIntervalSince1970
-            self.isRecording = true
-            
-            // Create new frame buffer and predictions for spotted sharks
-            self.recordedFrames = []
-            self.predictions = []
-        }
-    }
-    
-    func stopMetricRecording() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            self.isRecording = false
-            
-            // Calculate metrics
-            self.fps = Double(self.count) / (Date().timeIntervalSince1970 - self.startTime)
-            
-            // Print metrics
-            print("-== METRICS ==-")
-            print("Frames processed: \(self.count)")
-            print("Frame count: \(self.recordedFrames.count)")
-            print("Prediction count: \(self.predictions.count)")
-            print("Average fps: \(self.fps)")
-            
-            // Send a prompt to save predictions
-            DispatchQueue.main.async {
-                let alertController = UIAlertController(title: "Save Predictions", message: "Do you want to save \(self.predictions.count) predictions?", preferredStyle: .alert)
-                
-                let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
-                    // Save recorded frames and predictions
-                    self.saveRecordedFrames()
-                    self.savePredictions()
-                    
-                    // TODO: Save all other metrics
-                    // FPS, hardware metrics
-                }
-                
-                let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
-                            
-                alertController.addAction(saveAction)
-                alertController.addAction(cancelAction)
-                
-                // Show the alert
-                guard let topViewController = UIApplication.shared.windows.first?.rootViewController else {
-                    return
-                }
-                
-                topViewController.present(alertController, animated: true, completion: nil)
-            }
-        }
-    }
-    
-    private func saveRecordedFrames() {
-        guard !self.recordedFrames.isEmpty else {
-            print("No recorded frames to save.")
-            return
-        }
-
+    private func setupVideoWriter() {
         // Create an asset writer to save the frames as a video
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let videoURL = documentsDirectory.appendingPathComponent("SharkSpottingVideo.mov")
-        
+
         // Check if the video file already exists at the specified URL
         if FileManager.default.fileExists(atPath: videoURL.path) {
             do {
@@ -243,38 +193,112 @@ class ObjectDetector: CameraManager {
             assetWriter.startWriting()
             assetWriter.startSession(atSourceTime: .zero)
 
-            var presentationTime = CMTime.zero
+            // Save video writer and its input for later use
+            self.videoWriter = assetWriter
+            self.videoWriterInput = assetWriterInput
+            self.videoWriterAdaptor = adaptor
+            self.videoURL = videoURL
+        } catch {
+            print("Error creating the asset writer: \(error.localizedDescription)")
+        }
+    }
 
-            // Iterate through each recorded frame and append it to the video
-            for pixelBuffer in self.recordedFrames {
-                while !adaptor.assetWriterInput.isReadyForMoreMediaData {
-                    Thread.sleep(forTimeInterval: 0.05)
+    func startMetricRecording() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Initialize counts and start time
+            self.count = 0
+            self.startTime = Date().timeIntervalSince1970
+            self.isRecording = true
+            self.totalCPUUsage = 0.0
+            
+            // Get the number of CPU cores
+            self.totalCPUCores = Double(ProcessInfo.processInfo.activeProcessorCount)
+            
+            // Create new predictions array for spotted sharks
+            self.predictions = []
+            
+            // Set up writing video out
+            self.setupVideoWriter()
+        }
+    }
+    
+    func stopMetricRecording() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.isRecording = false
+            self.endTime = Date().timeIntervalSince1970
+            
+            // Calculate metrics
+            self.fps = Double(self.count) / (self.endTime - self.startTime)
+            let averageCPUUsage = self.totalCPUUsage / (self.totalCPUCores * (self.endTime - self.startTime))
+            
+            // Print metrics
+            print("-== METRICS ==-")
+            print("Frames processed: \(self.count)")
+            print("Prediction count: \(self.predictions.count)")
+            print("Average fps: \(self.fps)")
+            print("Average CPU Utilization: \(averageCPUUsage * 100)%")
+            
+            // Send a prompt to save predictions
+            DispatchQueue.main.async {
+                let alertController = UIAlertController(title: "Save Predictions", message: "Do you want to save \(self.predictions.count) predictions?", preferredStyle: .alert)
+                
+                let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
+                    // Save predictions
+                    self.savePredictions()
+                    
+                    // TODO: Save all other metrics
+                    // FPS, hardware metrics
                 }
-
-                if adaptor.assetWriterInput.isReadyForMoreMediaData {
-                    adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
-                    presentationTime = CMTimeAdd(presentationTime, CMTimeMake(value: 1, timescale: Int32(fps)))
+                
+                let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+                            
+                alertController.addAction(saveAction)
+                alertController.addAction(cancelAction)
+                
+                // Show the alert
+                guard let topViewController = UIApplication.shared.windows.first?.rootViewController else {
+                    return
                 }
+                
+                topViewController.present(alertController, animated: true, completion: nil)
             }
+        }
+    }
 
-            assetWriter.finishWriting {
-                if assetWriter.status == .completed {
-                    // Save the video to the Photos library
-                    PHPhotoLibrary.requestAuthorization { status in
-                        if status == .authorized {
-                            PHPhotoLibrary.shared().performChanges({
-                                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
-                            }) { success, error in
-                                if success {
-                                    print("Video saved to Photos library.")
-                                } else {
-                                    print("Error saving video to Photos library: \(error?.localizedDescription ?? "Unknown error")")
-                                }
-                            }
+    private func savePredictions() {
+        // TODO: Implement the code to save predictions.
+        // Iterate through the `self.predictions` array and save the bounding boxes and labels.
+        // Ensure that the bounding boxes are scaled to the output size.
+        
+        // Save the recorded video
+        guard let videoURL = self.videoURL else {
+            print("No video URL found.")
+            return
+        }
+        
+        func saveVideo() {
+            // Save the video to the Photos library
+            PHPhotoLibrary.requestAuthorization { status in
+                if status == .authorized {
+                    PHPhotoLibrary.shared().performChanges({
+                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
+                    }) { success, error in
+                        if success {
+                            print("Video saved to Photos library.")
                         } else {
-                            print("Permission to access Photos library denied.")
+                            print("Error saving video to Photos library: \(error?.localizedDescription ?? "Unknown error")")
                         }
                     }
+                } else {
+                    print("Permission to access Photos library denied.")
+                }
+            }
+        }
+        
+        if let assetWriter = self.videoWriter {
+            assetWriter.finishWriting {
+                if assetWriter.status == .completed {
+                    saveVideo()
                 } else {
                     if let error = assetWriter.error {
                         print("Error saving the video: \(error.localizedDescription)")
@@ -283,16 +307,7 @@ class ObjectDetector: CameraManager {
                     }
                 }
             }
-        } catch {
-            print("Error creating the asset writer: \(error.localizedDescription)")
         }
-    }
-
-    
-    private func savePredictions() {
-        // TODO: Implement the code to save predictions.
-        // Iterate through the `self.predictions` array and save the bounding boxes and labels.
-        // Ensure that the bounding boxes are scaled to the output size.
     }
 }
 

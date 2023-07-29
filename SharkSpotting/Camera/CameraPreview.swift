@@ -15,9 +15,8 @@ struct CameraPreview: UIViewRepresentable {
         let view = UIView(frame: UIScreen.main.bounds)
         
         // Setup camera and preview layer
-        detector.setupCamera()
+        detector.setupCamera(frame: view.layer.bounds)
         detector.previewLayer.videoGravity = .resizeAspectFill
-        detector.previewLayer.frame = view.layer.bounds
         view.layer.addSublayer(detector.previewLayer)
         
         // Start detection
