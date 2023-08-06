@@ -14,17 +14,16 @@ import Photos
 class ObjectDetector: CameraManager {
     private var request: VNCoreMLRequest!
     var previewLayer: AVCaptureVideoPreviewLayer!
+    var isRecording: Bool = false
     
     // Detection
     private var boundingBoxLayers: [CAShapeLayer] = []
     private var labelLayers: [CATextLayer] = []
+    private var inputImageSize: CGSize = CGSize(width: 0, height: 0)
     
     // FPS
-    var isRecording: Bool = false
-    var count: Int = 0
     var fps: Double = 0.0
-    private var startTime: Double = 0.0
-    private var endTime: Double = 0.0
+    private var framesProcessedDuringInterval: Int = 0
     
     // Video and predictions
     private var videoWriter: AVAssetWriter?
@@ -36,8 +35,12 @@ class ObjectDetector: CameraManager {
     private var presentationTime = CMTime.zero
     
     // Hardware Metrics
-    private var totalCPUUsage: Double = 0.0
-    private var totalCPUCores: Double = 0.0
+    private var metricsTimer: Timer?
+    var totalCPUUsage: Double = 0.0
+    private var accumulatedCPUUsage: Double = 0.0
+    private var accumulatedCPUSamples: Int = 0
+    var memoryUsage: UInt64 = 0
+
     
     // Setting up camera and model
     func setupCamera(frame: CGRect) {
@@ -54,6 +57,9 @@ class ObjectDetector: CameraManager {
         // Create a vision request with the model
         self.request = VNCoreMLRequest(model: model, completionHandler: handleDetection)
         self.request.imageCropAndScaleOption = .scaleFill
+        
+        // Can't find a way to do this programmatically on a VNCoreMLModel...
+        self.inputImageSize = CGSize(width: 640, height: 640)
     }
     
     // AVCaptureVideoDataOutputSampleBufferDelegate method
@@ -64,6 +70,8 @@ class ObjectDetector: CameraManager {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([self.request])
         
+        self.framesProcessedDuringInterval += 1
+        
         // Record frame if a shark is spotted and recording is enabled
         if sawShark && isRecording, let videoWriterInput = videoWriterInput {
             if videoWriterInput.isReadyForMoreMediaData {
@@ -71,6 +79,40 @@ class ObjectDetector: CameraManager {
                 self.presentationTime = CMTimeAdd(presentationTime, CMTimeMake(value:1, timescale: Int32(30)))
             }
         }
+    }
+    
+    func getConvertedRect(boundingBox: CGRect, inImage imageSize: CGSize, containedIn containerSize: CGSize) -> CGRect {
+        
+        let rectOfImage: CGRect
+        
+        let imageAspect = imageSize.width / imageSize.height
+        let containerAspect = containerSize.width / containerSize.height
+        
+        if imageAspect > containerAspect { // image extends left and right
+            let newImageWidth = containerSize.height * imageAspect // the width of the overflowing image
+            let newX = -(newImageWidth - containerSize.width) / 2
+            rectOfImage = CGRect(x: newX, y: 0, width: newImageWidth, height: containerSize.height)
+            
+        } else { // image extends top and bottom
+            let newImageHeight = containerSize.width * (1 / imageAspect) // the width of the overflowing image
+            let newY = -(newImageHeight - containerSize.height) / 2
+            rectOfImage = CGRect(x: 0, y: newY, width: containerSize.width, height: newImageHeight)
+        }
+        
+        let newOriginBoundingBox = CGRect(
+        x: boundingBox.origin.x,
+        y: 1 - boundingBox.origin.y - boundingBox.height,
+        width: boundingBox.width,
+        height: boundingBox.height
+        )
+        
+        var convertedRect = VNImageRectForNormalizedRect(newOriginBoundingBox, Int(rectOfImage.width), Int(rectOfImage.height))
+        
+        // add the margins
+        convertedRect.origin.x += rectOfImage.origin.x
+        convertedRect.origin.y += rectOfImage.origin.y
+        
+        return convertedRect
     }
 
     private func handleDetection(request: VNRequest, error: Error?) {
@@ -88,11 +130,6 @@ class ObjectDetector: CameraManager {
             
             guard let results = request.results as? [VNRecognizedObjectObservation] else { return }
             
-            // Take metrics if recording
-            if (self.isRecording) {
-                self.count += 1
-            }
-            
             // Loop over the detected objects and draw bounding boxes
             self.sawShark = false
             for result in results {
@@ -108,9 +145,12 @@ class ObjectDetector: CameraManager {
                 // Get the bounding box of the object in the coordinate space of the preview layer
                 // TODO: Weird stuff is happening because camera input size != previewLayer output size
                 // TODO: The camera is taking pictures that are wider than the previewlayer, causing the bounding boxes not to be scaled correctly
+                
                 let previewLayerSize = self.previewLayer.frame.size
-                let boundingBox = result.boundingBox
-                    .applying(CGAffineTransform(scaleX: previewLayerSize.width, y: previewLayerSize.height))
+//                let boundingBox = result.boundingBox
+//                    .applying(CGAffineTransform(scaleX: previewLayerSize.width, y: previewLayerSize.height))
+                
+                let boundingBox = self.getConvertedRect(boundingBox: result.boundingBox, inImage: self.inputImageSize, containedIn: previewLayerSize)
 
                 // Create a path for the bounding box
                 let path = UIBezierPath(rect: boundingBox)
@@ -147,6 +187,98 @@ class ObjectDetector: CameraManager {
             if (self.sawShark && self.isRecording) {
                 self.predictions.append(results)
             }
+        }
+    }
+    
+    // Original method inspired from: https://stackoverflow.com/questions/44744372/get-cpu-usage-ios-swift
+    // Some modifications made to avoid allocation/deallocation
+    func hostCPULoadInfo() -> host_cpu_load_info? {
+        let HOST_CPU_LOAD_INFO_COUNT = MemoryLayout<host_cpu_load_info>.stride/MemoryLayout<integer_t>.stride
+        
+        var size = mach_msg_type_number_t(HOST_CPU_LOAD_INFO_COUNT)
+        var cpuLoadInfo = host_cpu_load_info()
+
+        let result = withUnsafeMutablePointer(to: &cpuLoadInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: HOST_CPU_LOAD_INFO_COUNT) {
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &size)
+            }
+        }
+        if result != KERN_SUCCESS{
+            print("Error getting CPU info: \(result)")
+            return nil
+        }
+        return cpuLoadInfo
+    }
+    
+    private func updateFPS() {
+        DispatchQueue.global(qos: .background).async {
+            // Calculate FPS
+            self.fps = Double(self.framesProcessedDuringInterval)
+            
+            // Print average FPS every second
+            print("Average FPS: \(self.fps)")
+
+            // Reset counters for the next interval
+            self.framesProcessedDuringInterval = 0
+        }
+    }
+
+    func getCPUUsage() {
+        guard let load = hostCPULoadInfo() else {
+            return
+        }
+        
+        let userTicks = Double(load.cpu_ticks.0)
+        let systemTicks = Double(load.cpu_ticks.1)
+        let idleTicks = Double(load.cpu_ticks.2)
+        let totalTicks = userTicks + systemTicks + idleTicks
+        
+        // Calculate CPU usage percentage for the interval
+        if totalTicks > 0 {
+            let usedTicks = userTicks + systemTicks
+            let intervalCPUUsage = usedTicks / totalTicks
+            self.accumulatedCPUUsage += intervalCPUUsage
+            self.accumulatedCPUSamples += 1
+        }
+        
+        // Calculate the average CPU usage
+        if self.accumulatedCPUSamples > 0 {
+            self.totalCPUUsage = self.accumulatedCPUUsage / Double(self.accumulatedCPUSamples)
+        }
+    }
+    
+    private func updateHardwareUsage() {
+        DispatchQueue.global(qos: .background).async {
+            self.getCPUUsage()
+            self.getMemoryUsage()
+
+            print("Average CPU Usage: \(self.totalCPUUsage * 100.0)%")
+            print("Average Memory Usage: \(self.memoryUsage) bytes")
+
+            self.accumulatedCPUUsage = 0.0
+            self.accumulatedCPUSamples = 0
+        }
+    }
+    
+    @objc private func updateMetrics() {
+        updateHardwareUsage()
+        updateFPS()
+    }
+    
+    func getMemoryUsage() {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info_data_t>.size) / 4
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+
+        if result == KERN_SUCCESS {
+            self.memoryUsage = info.resident_size
+        } else {
+            print("Error getting memory usage: \(result)")
         }
     }
     
@@ -205,38 +337,39 @@ class ObjectDetector: CameraManager {
 
     func startMetricRecording() {
         DispatchQueue.global(qos: .userInitiated).async {
-            // Initialize counts and start time
-            self.count = 0
-            self.startTime = Date().timeIntervalSince1970
+            // Start recording
             self.isRecording = true
-            self.totalCPUUsage = 0.0
-            
-            // Get the number of CPU cores
-            self.totalCPUCores = Double(ProcessInfo.processInfo.activeProcessorCount)
-            
-            // Create new predictions array for spotted sharks
-            self.predictions = []
-            
-            // Set up writing video out
             self.setupVideoWriter()
+            
+            // Reset any metrics
+            self.accumulatedCPUUsage = 0.0
+            self.accumulatedCPUSamples = 0
+            self.framesProcessedDuringInterval = 0
+
+            // Create new predictions array
+            self.predictions = []
+        }
+        
+        // Start timer to avoid buffer overflow
+        DispatchQueue.main.async {
+            self.metricsTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(self.updateMetrics), userInfo: nil, repeats: true)
+            RunLoop.main.add(self.metricsTimer!, forMode: .common)
         }
     }
     
     func stopMetricRecording() {
         DispatchQueue.global(qos: .userInitiated).async {
             self.isRecording = false
-            self.endTime = Date().timeIntervalSince1970
             
-            // Calculate metrics
-            self.fps = Double(self.count) / (self.endTime - self.startTime)
-            let averageCPUUsage = self.totalCPUUsage / (self.totalCPUCores * (self.endTime - self.startTime))
+            // Stop the metrics timer
+            self.metricsTimer?.invalidate()
+            self.metricsTimer = nil
             
             // Print metrics
             print("-== METRICS ==-")
-            print("Frames processed: \(self.count)")
             print("Prediction count: \(self.predictions.count)")
-            print("Average fps: \(self.fps)")
-            print("Average CPU Utilization: \(averageCPUUsage * 100)%")
+            print("Final Average fps: \(self.fps)")
+            print("Final Average CPU Usage: \(self.totalCPUUsage * 100.0)%")
             
             // Send a prompt to save predictions
             DispatchQueue.main.async {
@@ -247,7 +380,7 @@ class ObjectDetector: CameraManager {
                     self.savePredictions()
                     
                     // TODO: Save all other metrics
-                    // FPS, hardware metrics
+                    self.saveHardwareMetrics()
                 }
                 
                 let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
@@ -263,6 +396,10 @@ class ObjectDetector: CameraManager {
                 topViewController.present(alertController, animated: true, completion: nil)
             }
         }
+    }
+    
+    private func saveHardwareMetrics() {
+        // TODO: Implemnent this
     }
 
     private func savePredictions() {
@@ -319,37 +456,5 @@ extension CGRect {
             width: size.width * width,
             height: size.height * height
         )
-    }
-}
-
-extension CVPixelBuffer {
-    func copy() -> CVPixelBuffer {
-        precondition(CFGetTypeID(self) == CVPixelBufferGetTypeID(), "copy() cannot be called on a non-CVPixelBuffer")
-
-        var _copy : CVPixelBuffer?
-        CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            CVPixelBufferGetWidth(self),
-            CVPixelBufferGetHeight(self),
-            CVPixelBufferGetPixelFormatType(self),
-            nil,
-            &_copy)
-
-        guard let copy = _copy else { fatalError() }
-
-        CVPixelBufferLockBaseAddress(self, CVPixelBufferLockFlags.readOnly)
-        CVPixelBufferLockBaseAddress(copy, CVPixelBufferLockFlags(rawValue: 0))
-
-
-        let copyBaseAddress = CVPixelBufferGetBaseAddress(copy)
-        let currBaseAddress = CVPixelBufferGetBaseAddress(self)
-
-        memcpy(copyBaseAddress, currBaseAddress, CVPixelBufferGetDataSize(self))
-
-        CVPixelBufferUnlockBaseAddress(copy, CVPixelBufferLockFlags(rawValue: 0))
-        CVPixelBufferUnlockBaseAddress(self, CVPixelBufferLockFlags.readOnly)
-
-
-        return copy
     }
 }
