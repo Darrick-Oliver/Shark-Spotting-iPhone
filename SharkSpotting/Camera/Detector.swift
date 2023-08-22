@@ -30,7 +30,7 @@ class ObjectDetector: CameraManager {
     private var videoWriterInput: AVAssetWriterInput?
     private var videoWriterAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var videoURL: URL?
-    private var sawShark: Bool = false
+    private var predictionsFolderURL: URL?
     private var predictions: [[VNRecognizedObjectObservation]] = []
     private var presentationTime = CMTime.zero
     
@@ -40,7 +40,6 @@ class ObjectDetector: CameraManager {
     private var accumulatedCPUUsage: Double = 0.0
     private var accumulatedCPUSamples: Int = 0
     var memoryUsage: UInt64 = 0
-
     
     // Setting up camera and model
     func setupCamera(frame: CGRect) {
@@ -50,7 +49,7 @@ class ObjectDetector: CameraManager {
         self.previewLayer.frame = frame
 
         // Load the Core ML model
-        guard let model = try? VNCoreMLModel(for: best(configuration: MLModelConfiguration()).model) else {
+        guard let model = try? VNCoreMLModel(for: cow_best(configuration: MLModelConfiguration()).model) else {
             fatalError("Failed to load model")
         }
 
@@ -73,7 +72,7 @@ class ObjectDetector: CameraManager {
         self.framesProcessedDuringInterval += 1
         
         // Record frame if a shark is spotted and recording is enabled
-        if sawShark && isRecording, let videoWriterInput = videoWriterInput {
+        if isRecording, let videoWriterInput = videoWriterInput {
             if videoWriterInput.isReadyForMoreMediaData {
                 videoWriterAdaptor?.append(pixelBuffer, withPresentationTime: self.presentationTime)
                 self.presentationTime = CMTimeAdd(presentationTime, CMTimeMake(value:1, timescale: Int32(30)))
@@ -131,26 +130,18 @@ class ObjectDetector: CameraManager {
             guard let results = request.results as? [VNRecognizedObjectObservation] else { return }
             
             // Loop over the detected objects and draw bounding boxes
-            self.sawShark = false
             for result in results {
                 // Get the object label and confidence score
                 let label = result.labels[0].identifier
                 let confidence = result.labels[0].confidence
-                
-                // Record if a shark was spotted
-                if (!self.sawShark && label == "shark") {
-                    self.sawShark = true
-                }
                 
                 // Get the bounding box of the object in the coordinate space of the preview layer
                 // TODO: Weird stuff is happening because camera input size != previewLayer output size
                 // TODO: The camera is taking pictures that are wider than the previewlayer, causing the bounding boxes not to be scaled correctly
                 
                 let previewLayerSize = self.previewLayer.frame.size
-//                let boundingBox = result.boundingBox
-//                    .applying(CGAffineTransform(scaleX: previewLayerSize.width, y: previewLayerSize.height))
-                
-                let boundingBox = self.getConvertedRect(boundingBox: result.boundingBox, inImage: self.inputImageSize, containedIn: previewLayerSize)
+                let boundingBox = result.boundingBox
+                    .applying(CGAffineTransform(scaleX: previewLayerSize.width, y: previewLayerSize.height))
 
                 // Create a path for the bounding box
                 let path = UIBezierPath(rect: boundingBox)
@@ -184,11 +175,50 @@ class ObjectDetector: CameraManager {
                 self.labelLayers.append(labelLayer)
             }
             
-            if (self.sawShark && self.isRecording) {
+            if (self.isRecording) {
                 self.predictions.append(results)
             }
         }
     }
+    
+    struct Prediction: Codable {
+        let confidence: Double
+        let identifier: String
+    }
+    
+    private func savePredictionsToFile() {
+        guard let folderUrl = predictionsFolderURL else {
+            print("Predictions file URL is not initialized.")
+            return
+        }
+        // Create file name
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd_HHmmssSSSS"
+        let currentDate = Date()
+        let formattedDate = dateFormatter.string(from: currentDate)
+        let filename = "predictions_\(formattedDate).json"
+        
+        // Create url
+        let fileUrl = folderUrl.appendingPathComponent(filename)
+
+        let encoder = JSONEncoder()
+        
+        let newPredictions = self.predictions.map { frame in
+            return frame.map { prediction in
+                return prediction.labels.map { label in
+                    Prediction(confidence: Double(label.confidence), identifier: label.identifier)
+                }
+            }
+        }
+        
+        do {
+            let jsonData = try encoder.encode(newPredictions)
+            try jsonData.write(to: fileUrl)
+        } catch {
+            print("Error saving predictions: \(error.localizedDescription)")
+        }
+    }
+    
     
     // Original method inspired from: https://stackoverflow.com/questions/44744372/get-cpu-usage-ios-swift
     // Some modifications made to avoid allocation/deallocation
@@ -257,6 +287,9 @@ class ObjectDetector: CameraManager {
 
             self.accumulatedCPUUsage = 0.0
             self.accumulatedCPUSamples = 0
+            
+            self.savePredictionsToFile()
+            self.predictions = []
         }
     }
     
@@ -334,20 +367,46 @@ class ObjectDetector: CameraManager {
             print("Error creating the asset writer: \(error.localizedDescription)")
         }
     }
+    
+    private func setupPredictionsFolder() {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let baseFolderName = "Predictions"
+        var folderName = baseFolderName
+        var folderIndex = 0
+
+        // Find the earliest available folder index
+        while FileManager.default.fileExists(atPath: documentsDirectory.appendingPathComponent(folderName).path) {
+            folderIndex += 1
+            folderName = "\(baseFolderName)_\(folderIndex)"
+        }
+        
+        let folderURL = documentsDirectory.appendingPathComponent(folderName)
+        
+        do {
+            // Create the folder if it doesn't exist
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            print("Error creating predictions folder: \(error.localizedDescription)")
+            return
+        }
+        
+        self.predictionsFolderURL = folderURL
+    }
+
 
     func startMetricRecording() {
         DispatchQueue.global(qos: .userInitiated).async {
             // Start recording
             self.isRecording = true
             self.setupVideoWriter()
+            self.setupPredictionsFolder()
+            self.predictions = []
+            self.presentationTime = CMTime.zero
             
             // Reset any metrics
             self.accumulatedCPUUsage = 0.0
             self.accumulatedCPUSamples = 0
             self.framesProcessedDuringInterval = 0
-
-            // Create new predictions array
-            self.predictions = []
         }
         
         // Start timer to avoid buffer overflow
@@ -367,34 +426,12 @@ class ObjectDetector: CameraManager {
             
             // Print metrics
             print("-== METRICS ==-")
-            print("Prediction count: \(self.predictions.count)")
             print("Final Average fps: \(self.fps)")
             print("Final Average CPU Usage: \(self.totalCPUUsage * 100.0)%")
             
-            // Send a prompt to save predictions
-            DispatchQueue.main.async {
-                let alertController = UIAlertController(title: "Save Predictions", message: "Do you want to save \(self.predictions.count) predictions?", preferredStyle: .alert)
-                
-                let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
-                    // Save predictions
-                    self.savePredictions()
-                    
-                    // TODO: Save all other metrics
-                    self.saveHardwareMetrics()
-                }
-                
-                let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
-                            
-                alertController.addAction(saveAction)
-                alertController.addAction(cancelAction)
-                
-                // Show the alert
-                guard let topViewController = UIApplication.shared.windows.first?.rootViewController else {
-                    return
-                }
-                
-                topViewController.present(alertController, animated: true, completion: nil)
-            }
+            // Save predictions and metrics
+            self.savePredictions()
+            self.saveHardwareMetrics()
         }
     }
     
@@ -403,10 +440,6 @@ class ObjectDetector: CameraManager {
     }
 
     private func savePredictions() {
-        // TODO: Implement the code to save predictions.
-        // Iterate through the `self.predictions` array and save the bounding boxes and labels.
-        // Ensure that the bounding boxes are scaled to the output size.
-        
         // Save the recorded video
         guard let videoURL = self.videoURL else {
             print("No video URL found.")

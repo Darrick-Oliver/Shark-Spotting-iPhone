@@ -19,6 +19,8 @@
 		B9DF792C29DE1E560019C0E5 /* SharkSpottingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DF792B29DE1E560019C0E5 /* SharkSpottingTests.swift */; };
 		B9DF793629DE1E560019C0E5 /* SharkSpottingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DF793529DE1E560019C0E5 /* SharkSpottingUITests.swift */; };
 		B9DF793829DE1E560019C0E5 /* SharkSpottingUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DF793729DE1E560019C0E5 /* SharkSpottingUITestsLaunchTests.swift */; };
+		F453F05E2A80447B00BC43D2 /* DetectorRefactored.swift in Sources */ = {isa = PBXBuildFile; fileRef = F453F05D2A80447B00BC43D2 /* DetectorRefactored.swift */; };
+		F47B00862A9458FE00A950E9 /* cow_best.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = F47B00852A9458FE00A950E9 /* cow_best.mlmodel */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,6 +56,8 @@
 		B9DF793129DE1E560019C0E5 /* SharkSpottingUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SharkSpottingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B9DF793529DE1E560019C0E5 /* SharkSpottingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkSpottingUITests.swift; sourceTree = "<group>"; };
 		B9DF793729DE1E560019C0E5 /* SharkSpottingUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkSpottingUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		F453F05D2A80447B00BC43D2 /* DetectorRefactored.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectorRefactored.swift; sourceTree = "<group>"; };
+		F47B00852A9458FE00A950E9 /* cow_best.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = cow_best.mlmodel; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +89,7 @@
 			isa = PBXGroup;
 			children = (
 				B92403DE2A3B98B400495EFC /* best.mlmodel */,
+				F47B00852A9458FE00A950E9 /* cow_best.mlmodel */,
 				B92403E02A3B99BA00495EFC /* another.mlmodel */,
 			);
 			path = Models;
@@ -96,6 +101,7 @@
 				B9159A6D29EE0F78005046DF /* CameraPreview.swift */,
 				B9159A6B29EDFED3005046DF /* Camera.swift */,
 				B9159AB029FA1AC1005046DF /* Detector.swift */,
+				F453F05D2A80447B00BC43D2 /* DetectorRefactored.swift */,
 			);
 			path = Camera;
 			sourceTree = "<group>";
@@ -292,8 +298,10 @@
 				B9159A6E29EE0F78005046DF /* CameraPreview.swift in Sources */,
 				B9DF791B29DE1E550019C0E5 /* SharkSpottingApp.swift in Sources */,
 				B92403E12A3B99BA00495EFC /* another.mlmodel in Sources */,
+				F453F05E2A80447B00BC43D2 /* DetectorRefactored.swift in Sources */,
 				B92403DF2A3B98B400495EFC /* best.mlmodel in Sources */,
 				B9159A6C29EDFED3005046DF /* Camera.swift in Sources */,
+				F47B00862A9458FE00A950E9 /* cow_best.mlmodel in Sources */,
 				B9159AB129FA1AC1005046DF /* Detector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
